@@ -1,0 +1,50 @@
+#!/bin/sh
+# Ajustes finais do sistema Brisa, feitos dentro da imagem depois de instalados os pacotes.
+set -e
+
+echo "Brisa: instalador com a marca Brisa"
+rsvg-convert -w 256 -h 256 /usr/share/brisa/icones/brisa.svg -o /etc/calamares/branding/brisa/logo.png
+rsvg-convert -w 934 -h 584 /usr/share/brisa/fundos/aurora.svg -o /etc/calamares/branding/brisa/welcome.png
+# Imagem da conta no ecrã de início de sessão
+rsvg-convert -w 256 -h 256 /usr/share/brisa/icones/brisa.svg -o /usr/share/brisa/icones/brisa.png
+# O atalho "Install Debian" e o seu arranque automatico dao lugar aos do Brisa
+rm -f /usr/share/applications/calamares-install-debian.desktop /etc/xdg/autostart/calamares-desktop-icon.desktop
+
+echo "Brisa: fundo de ecra"
+for svg in /usr/share/brisa/fundos/*.svg; do
+  nome=$(basename "$svg" .svg)
+  rsvg-convert -w 2560 -h 1600 "$svg" -o "/usr/share/brisa/fundos/$nome.png"
+  rsvg-convert -w 320 -h 200 "$svg" -o "/usr/share/brisa/fundos/$nome-mini.png"
+  # Versão desfocada, usada por trás do ecrã de Aplicações
+  cat > "/usr/share/brisa/fundos/desfocar.svg" <<EOF
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800"><defs><filter id="f" x="0" y="0" width="1" height="1"><feGaussianBlur stdDeviation="26"/></filter></defs><image href="$nome.png" x="-140" y="-110" width="1560" height="1020" preserveAspectRatio="xMidYMid slice" filter="url(#f)"/></svg>
+EOF
+  rsvg-convert "/usr/share/brisa/fundos/desfocar.svg" -o "/usr/share/brisa/fundos/$nome-desfocado.png"
+done
+rm -f /usr/share/brisa/fundos/desfocar.svg
+
+echo "Brisa: suporte a aplicacoes Windows de 32 bits"
+dpkg --add-architecture i386
+apt-get update
+apt-get install -y --no-install-recommends wine32:i386
+
+echo "Brisa: catalogo Flathub para a loja"
+flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo || \
+  echo "AVISO: nao foi possivel registar o Flathub; pode ser acrescentado depois."
+flatpak config --system --set languages "pt;en" || true
+
+echo "Brisa: predefinicoes do ambiente (botoes das janelas, tema, letra)"
+dconf update
+
+echo "Brisa: swap comprimido em RAM"
+printf 'ALGO=zstd\nPERCENT=60\n' > /etc/default/zramswap
+
+echo "Brisa: idiomas"
+sed -i 's/^# *\(pt_PT.UTF-8\|pt_BR.UTF-8\|en_US.UTF-8\)/\1/' /etc/locale.gen
+locale-gen
+
+echo "Brisa: identidade"
+sed -i --follow-symlinks 's/^PRETTY_NAME=.*/PRETTY_NAME="Brisa 1.0 (base Debian 13)"/' /etc/os-release
+
+chmod 755 /usr/local/bin/brisa-*
+update-desktop-database -q /usr/share/applications || true

@@ -1,0 +1,276 @@
+#!/usr/bin/env python3
+"""Definições do Brisa: idioma, teclado e animações.
+
+Tudo é guardado na conta do utilizador, sem palavra-passe de administrador:
+  ~/.config/brisa/idioma   idioma da sessão (lido por brisa-sessao ao entrar)
+  ~/.config/wayfire.ini    teclado e animações (o Wayfire aplica as mudanças de imediato)
+"""
+import os
+import re
+import subprocess
+
+import gi
+
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk  # noqa: E402
+
+PT = os.environ.get('LANG', 'pt').lower().startswith('pt')
+CFG = os.path.expanduser('~/.config')
+F_IDIOMA = os.path.join(CFG, 'brisa', 'idioma')
+F_TECLADO = os.path.join(CFG, 'brisa', 'teclado')
+F_WAYFIRE = os.path.join(CFG, 'wayfire.ini')
+F_FUNDO = os.path.join(CFG, 'brisa', 'fundo')
+PASTA_FUNDOS = '/usr/share/brisa/fundos'
+FUNDOS = [('aurora', 'Aurora'), ('orbita', 'Órbita'), ('seda', 'Seda'),
+          ('corrente', 'Corrente'), ('dunas', 'Dunas'), ('prisma', 'Prisma')]
+
+IDIOMAS = [('pt_PT.UTF-8', 'Português (Portugal)'), ('pt_BR.UTF-8', 'Português (Brasil)'), ('en_US.UTF-8', 'English')]
+TECLADOS = [('pt', 'Português'), ('br', 'Português (Brasil)'), ('us', 'English (US)'), ('gb', 'English (UK)'),
+            ('es', 'Español'), ('fr', 'Français')]
+
+
+def t(pt, en):
+    return pt if PT else en
+
+
+def ini_ler(seccao, chave, omissao=''):
+    try:
+        linhas = open(F_WAYFIRE, encoding='utf-8').read().split('\n')
+    except OSError:
+        return omissao
+    dentro = False
+    for linha in linhas:
+        s = linha.strip()
+        if s.startswith('['):
+            dentro = s == f'[{seccao}]'
+        elif dentro:
+            m = re.match(rf'{re.escape(chave)}\s*=\s*(.*)$', s)
+            if m:
+                return m.group(1).strip()
+    return omissao
+
+
+def ini_escrever(seccao, chave, valor):
+    """Altera uma chave do wayfire.ini preservando os comentários e a ordem do ficheiro."""
+    try:
+        linhas = open(F_WAYFIRE, encoding='utf-8').read().split('\n')
+    except OSError:
+        linhas = []
+    saida, dentro, feito = [], False, False
+    for linha in linhas:
+        s = linha.strip()
+        if s.startswith('['):
+            if dentro and not feito:
+                saida.append(f'{chave} = {valor}')
+                feito = True
+            dentro = s == f'[{seccao}]'
+        elif dentro and re.match(rf'{re.escape(chave)}\s*=', s):
+            linha, feito = f'{chave} = {valor}', True
+        saida.append(linha)
+    if not feito:
+        if not dentro:
+            saida.append(f'[{seccao}]')
+        saida.append(f'{chave} = {valor}')
+    with open(F_WAYFIRE, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(saida))
+
+
+def idioma_atual():
+    try:
+        valor = open(F_IDIOMA, encoding='utf-8').readline().strip()
+    except OSError:
+        valor = ''
+    valor = valor or os.environ.get('LANG', 'pt_PT.UTF-8')
+    codigos = [c for c, _ in IDIOMAS]
+    if valor in codigos:
+        return valor
+    return 'pt_PT.UTF-8' if valor.lower().startswith('pt') else 'en_US.UTF-8'
+
+
+CSS = b"""
+window.defs { background: #F3F5FA; }
+.defs-pagina { padding: 22px 26px; }
+.defs-titulo { font-weight: 800; font-size: 16px; color: #1B2130; }
+.defs-nota { color: #454E63; font-size: 13.5px; }
+.defs-cartao { background: #FFFFFF; border: 1px solid rgba(20, 30, 60, 0.12); border-radius: 14px; padding: 14px 16px; }
+.defs-aviso { background: #E7F0FF; border-radius: 10px; padding: 10px 12px; color: #1B2130; font-size: 13.5px; }
+.defs-principal { background: #2F7BF6; color: #FFFFFF; border-color: #1F66DB; border-radius: 9px; padding: 6px 14px; font-weight: 700; box-shadow: none; text-shadow: none; }
+.defs-principal:hover { background: #1F66DB; }
+.defs-fundo { padding: 6px; border-radius: 10px; border: 2px solid transparent; background: transparent; box-shadow: none; }
+.defs-fundo:checked { border-color: #2F7BF6; background: #E7F0FF; }
+"""
+
+
+class Definicoes(Gtk.Window):
+    def __init__(self):
+        super().__init__(title=t('Definições', 'Settings'))
+        self.set_default_size(520, 600)
+        self.get_style_context().add_class('defs')
+        estilo = Gtk.CssProvider()
+        estilo.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), estilo, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        pagina = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        pagina.get_style_context().add_class('defs-pagina')
+        rolo = Gtk.ScrolledWindow()
+        rolo.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        rolo.add(pagina)
+        self.add(rolo)
+
+        # ----- Idioma -----
+        self.seccao(pagina, t('Idioma', 'Language'),
+                    t('O idioma dos menus e das aplicações. A mudança aplica-se quando voltar a iniciar sessão.',
+                      'The language of menus and apps. The change applies the next time you log in.'))
+        cartao = self.cartao(pagina)
+        self.idioma_inicial = idioma_atual()
+        grupo = None
+        for codigo, nome in IDIOMAS:
+            b = Gtk.RadioButton.new_with_label_from_widget(grupo, nome)
+            grupo = grupo or b
+            b.set_active(codigo == self.idioma_inicial)
+            b.connect('toggled', self.ao_mudar_idioma, codigo)
+            cartao.pack_start(b, False, False, 0)
+        self.aviso = Gtk.Box(spacing=10)
+        self.aviso.get_style_context().add_class('defs-aviso')
+        self.aviso.set_no_show_all(True)
+        self.aviso_texto = Gtk.Label(xalign=0)
+        self.aviso_texto.set_line_wrap(True)
+        self.aviso_texto.show()
+        sair = Gtk.Button()
+        sair.get_style_context().add_class('defs-principal')
+        sair.set_valign(Gtk.Align.CENTER)
+        sair.connect('clicked', lambda *_: subprocess.Popen(
+            ['loginctl', 'terminate-session', os.environ.get('XDG_SESSION_ID', '')]))
+        sair.show()
+        self.botao_sair = sair
+        self.aviso.pack_start(self.aviso_texto, True, True, 0)
+        self.aviso.pack_start(sair, False, False, 0)
+        cartao.pack_start(self.aviso, False, False, 4)
+
+        # ----- Fundo -----
+        self.seccao(pagina, t('Fundo', 'Wallpaper'),
+                    t('A imagem do ambiente de trabalho. A mudança é imediata.', 'The desktop picture. The change is immediate.'))
+        cartao = self.cartao(pagina)
+        linha = Gtk.FlowBox()  # as miniaturas passam para a linha seguinte quando não cabem
+        linha.set_selection_mode(Gtk.SelectionMode.NONE)
+        linha.set_max_children_per_line(4)
+        try:
+            atual = open(F_FUNDO, encoding='utf-8').readline().strip() or 'aurora'
+        except OSError:
+            atual = 'aurora'
+        grupo = None
+        for codigo, nome in FUNDOS:
+            b = Gtk.RadioButton.new_from_widget(grupo)
+            grupo = grupo or b
+            b.set_mode(False)
+            b.get_style_context().add_class('defs-fundo')
+            caixa = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+            try:
+                mini = GdkPixbuf.Pixbuf.new_from_file_at_scale(f'{PASTA_FUNDOS}/{codigo}-mini.png', 132, 82, True)
+                caixa.pack_start(Gtk.Image.new_from_pixbuf(mini), False, False, 0)
+            except GLib.Error:
+                pass
+            caixa.pack_start(Gtk.Label(label=nome), False, False, 0)
+            b.add(caixa)
+            b.set_active(codigo == atual)
+            b.connect('toggled', self.ao_mudar_fundo, codigo)
+            linha.add(b)
+        cartao.pack_start(linha, False, False, 0)
+
+        # ----- Teclado -----
+        self.seccao(pagina, t('Teclado', 'Keyboard'),
+                    t('A disposição das teclas. A mudança é imediata.', 'The key layout. The change is immediate.'))
+        cartao = self.cartao(pagina)
+        self.teclado = Gtk.ComboBoxText()
+        atual = ini_ler('input', 'xkb_layout', 'pt').split(',')[0]
+        codigos = [c for c, _ in TECLADOS]
+        if atual not in codigos:
+            TECLADOS.append((atual, atual))
+        for codigo, nome in TECLADOS:
+            self.teclado.append(codigo, nome)
+        self.teclado.set_active_id(atual)
+        self.teclado.connect('changed', self.ao_mudar_teclado)
+        cartao.pack_start(self.teclado, False, False, 0)
+
+        # ----- Animações -----
+        self.seccao(pagina, t('Animações', 'Animations'),
+                    t('Transições ao abrir e fechar janelas. Desligue em computadores mais fracos.',
+                      'Transitions when opening and closing windows. Turn off on slower computers.'))
+        cartao = self.cartao(pagina)
+        linha = Gtk.Box(spacing=12)
+        rotulo = Gtk.Label(label=t('Animar as janelas', 'Animate windows'), xalign=0)
+        self.animacoes = Gtk.Switch()
+        self.animacoes.set_active(ini_ler('animate', 'open_animation', 'zoom') != 'none')
+        self.animacoes.connect('notify::active', self.ao_mudar_animacoes)
+        linha.pack_start(rotulo, True, True, 0)
+        linha.pack_start(self.animacoes, False, False, 0)
+        cartao.pack_start(linha, False, False, 0)
+
+        # ----- Avançadas -----
+        self.seccao(pagina, t('Mais opções', 'More options'),
+                    t('Atalhos de teclado, efeitos e comportamento das janelas, em detalhe (em inglês).',
+                      'Keyboard shortcuts, effects and window behaviour, in detail.'))
+        avancadas = Gtk.Button(label=t('Abrir as definições avançadas', 'Open advanced settings'))
+        avancadas.set_halign(Gtk.Align.START)
+        avancadas.connect('clicked', lambda *_: subprocess.Popen(['wcm'], start_new_session=True))
+        pagina.pack_start(avancadas, False, False, 0)
+
+    def seccao(self, pagina, titulo, nota):
+        a = Gtk.Label(label=titulo, xalign=0)
+        a.get_style_context().add_class('defs-titulo')
+        a.set_margin_top(10)
+        b = Gtk.Label(label=nota, xalign=0)
+        b.set_line_wrap(True)
+        b.get_style_context().add_class('defs-nota')
+        pagina.pack_start(a, False, False, 0)
+        pagina.pack_start(b, False, False, 0)
+
+    def cartao(self, pagina):
+        c = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        c.get_style_context().add_class('defs-cartao')
+        pagina.pack_start(c, False, False, 0)
+        return c
+
+    def ao_mudar_idioma(self, botao, codigo):
+        if not botao.get_active():
+            return
+        os.makedirs(os.path.dirname(F_IDIOMA), exist_ok=True)
+        with open(F_IDIOMA, 'w', encoding='utf-8') as f:
+            f.write(codigo + '\n')
+        mudou = codigo != self.idioma_inicial
+        # O aviso é escrito no idioma escolhido, para quem não lê o atual
+        novo_pt = codigo.startswith('pt')
+        self.aviso_texto.set_text('Termine a sessão para aplicar o novo idioma.' if novo_pt
+                                  else 'Log out to apply the new language.')
+        self.botao_sair.set_label('Terminar sessão' if novo_pt else 'Log out')
+        self.aviso.set_visible(mudou)
+
+    def ao_mudar_fundo(self, botao, codigo):
+        if not botao.get_active():
+            return
+        os.makedirs(os.path.dirname(F_FUNDO), exist_ok=True)
+        with open(F_FUNDO, 'w', encoding='utf-8') as f:
+            f.write(codigo + '\n')
+        subprocess.Popen(['brisa-fundo'], start_new_session=True)
+
+    def ao_mudar_teclado(self, combo):
+        codigo = combo.get_active_id()
+        if not codigo:
+            return
+        ini_escrever('input', 'xkb_layout', codigo)
+        os.makedirs(os.path.dirname(F_TECLADO), exist_ok=True)
+        with open(F_TECLADO, 'w', encoding='utf-8') as f:
+            f.write(codigo + '\n')
+
+    def ao_mudar_animacoes(self, interruptor, _):
+        valor = 'zoom' if interruptor.get_active() else 'none'
+        ini_escrever('animate', 'open_animation', valor)
+        ini_escrever('animate', 'close_animation', valor)
+
+
+if __name__ == '__main__':
+    GLib.set_prgname('brisa-definicoes')
+    janela = Definicoes()
+    janela.connect('destroy', Gtk.main_quit)
+    janela.show_all()
+    Gtk.main()

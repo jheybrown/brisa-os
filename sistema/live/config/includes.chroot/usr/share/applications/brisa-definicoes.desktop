@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Definições
+Name[en]=Settings
+Comment=Idioma, teclado e animações do Brisa
+Comment[en]=Brisa language, keyboard and animations
+Exec=brisa-definicoes
+Icon=/usr/share/brisa/icones/definicoes.svg
+Terminal=false
+Categories=Settings;
+Keywords=idioma;língua;teclado;language;keyboard;settings;

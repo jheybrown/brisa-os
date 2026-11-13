@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""Widgets do ambiente de trabalho do Brisa: relógio grande e "Continuar onde ficou".
+
+Ficam por baixo das janelas, no canto superior esquerdo, desenhados como uma camada do
+ambiente de trabalho (não aparecem na doca nem recebem o teclado). Clicar num ficheiro abre-o.
+Não aparecem na sessão de instalação.
+"""
+import datetime
+import os
+import sys
+
+import gi
+
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+gi.require_version('GtkLayerShell', '0.1')
+from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell, Pango  # noqa: E402
+
+if os.path.isdir('/run/live/medium') or os.environ.get('BRISA_AO_VIVO') == '1':
+    sys.exit(0)
+
+PT = os.environ.get('LANG', 'pt').lower().startswith('pt')
+DIAS = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo']
+MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro',
+         'novembro', 'dezembro']
+ICONES = {'.odt': 'writer', '.doc': 'writer', '.docx': 'writer', '.rtf': 'writer',
+          '.ods': 'calc', '.xls': 'calc', '.xlsx': 'calc', '.csv': 'calc', '.txt': 'notas', '.md': 'notas'}
+
+CSS = b"""
+window.widgets { background: transparent; }
+.cartao { background: rgba(22, 28, 52, 0.62); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 20px; padding: 18px 22px; }
+.hora { color: #FFFFFF; font: 800 64px Inter, sans-serif; letter-spacing: -2px; }
+.data { color: #C3CBE0; font: 500 15px Inter, sans-serif; }
+.titulo { color: #FFFFFF; font: 700 14px Inter, sans-serif; margin-bottom: 6px; }
+button.ficheiro { background: transparent; border: none; box-shadow: none; padding: 5px 6px; border-radius: 10px; }
+button.ficheiro:hover { background: rgba(255, 255, 255, 0.10); }
+.nome { color: #F2F4FA; font: 500 13.5px Inter, sans-serif; }
+.vazio { color: #A9B2CC; font: 500 13.5px Inter, sans-serif; }
+"""
+
+
+def data_hoje(agora):
+    if PT:
+        return f'{DIAS[agora.weekday()]}, {agora.day} de {MESES[agora.month - 1]}'
+    return agora.strftime('%A, %B %-d')
+
+
+class Widgets(Gtk.Window):
+    def __init__(self):
+        super().__init__(title='Brisa')
+        self.get_style_context().add_class('widgets')
+        visual = self.get_screen().get_rgba_visual()
+        if visual:
+            self.set_visual(visual)
+        self.set_app_paintable(True)
+
+        GtkLayerShell.init_for_window(self)
+        GtkLayerShell.set_layer(self, GtkLayerShell.Layer.BOTTOM)
+        GtkLayerShell.set_namespace(self, 'brisa-widgets')
+        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.TOP, True)
+        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.LEFT, True)
+        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.TOP, 14)
+        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.LEFT, 24)
+        GtkLayerShell.set_keyboard_mode(self, GtkLayerShell.KeyboardMode.NONE)
+
+        estilo = Gtk.CssProvider()
+        estilo.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), estilo, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        caixa = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        caixa.set_size_request(270, -1)
+        self.add(caixa)
+
+        relogio = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        relogio.get_style_context().add_class('cartao')
+        self.hora = Gtk.Label(xalign=0)
+        self.hora.get_style_context().add_class('hora')
+        self.data = Gtk.Label(xalign=0)
+        self.data.get_style_context().add_class('data')
+        relogio.pack_start(self.hora, False, False, 0)
+        relogio.pack_start(self.data, False, False, 0)
+        caixa.pack_start(relogio, False, False, 0)
+
+        self.recentes = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        self.recentes.get_style_context().add_class('cartao')
+        caixa.pack_start(self.recentes, False, False, 0)
+
+        self.gestor = Gtk.RecentManager.get_default()
+        self.gestor.connect('changed', lambda *_: self.preencher_recentes())
+        self.atualizar_hora()
+        GLib.timeout_add_seconds(5, self.atualizar_hora)
+        self.preencher_recentes()
+
+    def atualizar_hora(self):
+        agora = datetime.datetime.now()
+        self.hora.set_text(agora.strftime('%H:%M'))
+        self.data.set_text(data_hoje(agora))
+        return True
+
+    def preencher_recentes(self):
+        for filho in self.recentes.get_children():
+            self.recentes.remove(filho)
+        titulo = Gtk.Label(label='Continuar onde ficou' if PT else 'Pick up where you left off', xalign=0)
+        titulo.get_style_context().add_class('titulo')
+        self.recentes.pack_start(titulo, False, False, 0)
+        itens = [i for i in self.gestor.get_items() if i.is_local() and i.exists()]
+        itens.sort(key=lambda i: i.get_modified(), reverse=True)
+        if not itens:
+            vazio = Gtk.Label(label='Os ficheiros que abrir aparecem aqui.' if PT else 'Files you open show up here.', xalign=0)
+            vazio.set_line_wrap(True)
+            vazio.get_style_context().add_class('vazio')
+            self.recentes.pack_start(vazio, False, False, 0)
+        for item in itens[:4]:
+            nome = item.get_display_name()
+            ext = os.path.splitext(nome)[1].lower()
+            linha = Gtk.Box(spacing=10)
+            icone_svg = f'/usr/share/brisa/icones/{ICONES.get(ext, "ficheiros")}.svg'
+            try:
+                linha.pack_start(Gtk.Image.new_from_pixbuf(
+                    gi.repository.GdkPixbuf.Pixbuf.new_from_file_at_size(icone_svg, 28, 28)), False, False, 0)
+            except (GLib.Error, AttributeError):
+                pass
+            rotulo = Gtk.Label(label=nome, xalign=0)
+            rotulo.set_ellipsize(Pango.EllipsizeMode.END)
+            rotulo.set_max_width_chars(26)
+            rotulo.get_style_context().add_class('nome')
+            linha.pack_start(rotulo, True, True, 0)
+            botao = Gtk.Button()
+            botao.get_style_context().add_class('ficheiro')
+            botao.add(linha)
+            botao.set_tooltip_text(GLib.filename_from_uri(item.get_uri())[0])
+            botao.connect('clicked', lambda _b, u=item.get_uri(): Gio.AppInfo.launch_default_for_uri(u, None))
+            self.recentes.pack_start(botao, False, False, 0)
+        self.recentes.show_all()
+
+
+if __name__ == '__main__':
+    gi.require_version('GdkPixbuf', '2.0')
+    from gi.repository import GdkPixbuf  # noqa: F401,E402
+    GLib.set_prgname('brisa-widgets')
+    janela = Widgets()
+    janela.connect('destroy', Gtk.main_quit)
+    janela.show_all()
+    Gtk.main()

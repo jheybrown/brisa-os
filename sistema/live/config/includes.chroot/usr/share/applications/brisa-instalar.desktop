@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Instalar o Brisa
+Name[en]=Install Brisa
+Comment=Instala o Brisa no disco deste computador
+Comment[en]=Install Brisa on this computer's disk
+Exec=brisa-instalar
+Icon=/usr/share/brisa/icones/brisa.svg
+Terminal=false
+Categories=System;
+Keywords=instalar;install;calamares;

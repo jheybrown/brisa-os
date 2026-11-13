@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Brisa: ícones mais leves no LibreOffice, próximos do resto do sistema. -->
+<oor:data xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:oor="http://openoffice.org/2001/registry">
+  <dependency file="main"/>
+  <oor:component-data oor:package="org.openoffice.Office" oor:name="Common">
+    <node oor:name="Misc">
+      <prop oor:name="SymbolStyle"><value>elementary</value></prop>
+    </node>
+  </oor:component-data>
+</oor:data>

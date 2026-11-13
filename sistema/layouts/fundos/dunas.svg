@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" width="1440" height="900" preserveAspectRatio="xMidYMid slice">
+  <defs><filter id="f" filterUnits="userSpaceOnUse" x="-400" y="-400" width="2240" height="1700"><feGaussianBlur stdDeviation="80"/></filter>
+    <linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFF6EC"/><stop offset="1" stop-color="#FFE0C7"/></linearGradient>
+    <linearGradient id="d1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7D3B3"/><stop offset="1" stop-color="#EDBE97"/></linearGradient>
+    <linearGradient id="d2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EFB98F"/><stop offset="1" stop-color="#DE9F74"/></linearGradient>
+    <linearGradient id="d3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E0A076"/><stop offset="1" stop-color="#C9835B"/></linearGradient>
+    <linearGradient id="d4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C98058"/><stop offset="1" stop-color="#A9643F"/></linearGradient>
+  </defs>
+  <rect width="1440" height="900" fill="url(#ceu)"/>
+  <circle cx="1060" cy="330" r="190" fill="#FFC79A" opacity=".55" filter="url(#f)"/><circle cx="1060" cy="330" r="78" fill="#FFF1E2"/>
+  <path d="M0 560 C 260 470 480 520 700 560 S 1160 470 1440 520 V900 H0Z" fill="url(#d1)"/>
+  <path d="M0 650 C 300 560 560 700 860 640 S 1260 580 1440 640 V900 H0Z" fill="url(#d2)"/>
+  <path d="M0 740 C 220 690 520 800 820 740 S 1240 680 1440 750 V900 H0Z" fill="url(#d3)"/>
+  <path d="M0 830 C 300 790 640 880 940 830 S 1300 800 1440 840 V900 H0Z" fill="url(#d4)"/>
+  <g opacity="0.88"><g transform="translate(430.7 193.0) scale(3.287)" fill="none" stroke="#6A3A20" stroke-width="2" stroke-linecap="round"><path d="M3 9c3-3 6-3 9 0s6 3 9 0"/><path d="M3 15c3-3 6-3 9 0s6 3 9 0"/></g><text x="470" y="330" text-anchor="middle" font-family="Manrope, sans-serif" font-size="84" letter-spacing="9.1" fill="#6A3A20"><tspan font-weight="800">BRISA</tspan><tspan font-weight="400" dx="12.8">OS</tspan></text></g>
+</svg>

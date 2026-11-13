@@ -1,0 +1,41 @@
+#!/bin/sh
+# Abre o instalador do Brisa (Calamares). Só faz alguma coisa em modo de experimentação.
+#   brisa-instalar            abre o instalador
+#   brisa-instalar --rotulo   escreve o texto do botão da barra (nada, se já estiver instalado)
+#   brisa-instalar --arranque abre o instalador uma vez, ao entrar na sessão de experimentação
+em_experimentacao() { [ -d /run/live/medium ] && command -v calamares >/dev/null 2>&1; }
+
+case "$1" in
+  --rotulo)
+    if em_experimentacao; then
+      case "${LANG:-pt}" in pt*) echo "Instalar o Brisa" ;; *) echo "Install Brisa" ;; esac
+    fi
+    exit 0 ;;
+  --arranque)
+    em_experimentacao || exit 0
+    marca="${XDG_RUNTIME_DIR:-/tmp}/brisa-instalador-mostrado"
+    [ -e "$marca" ] && exit 0
+    : > "$marca"
+    sleep 4 ;;
+esac
+
+em_experimentacao || exit 0
+pgrep -x calamares >/dev/null 2>&1 && exit 0
+
+registo="${XDG_RUNTIME_DIR:-/tmp}/brisa-instalador.log"
+sudo -n mv /etc/fstab /etc/fstab.orig.calamares 2>/dev/null
+
+# O instalador corre como administrador, desenhado diretamente na sessão Wayland.
+# HOME e as pastas XDG apontam para as do administrador: assim não cria ficheiros
+# do administrador dentro da pasta pessoal do utilizador (isso impedia o Firefox de abrir).
+if sudo -n true 2>/dev/null; then
+  sudo -n env HOME=/root XDG_CONFIG_HOME=/root/.config XDG_CACHE_HOME=/root/.cache XDG_DATA_HOME=/root/.local/share \
+    XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$WAYLAND_DISPLAY" QT_QPA_PLATFORM=wayland \
+    LANG="${LANG:-pt_PT.UTF-8}" calamares >"$registo" 2>&1
+else
+  pkexec env XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$WAYLAND_DISPLAY" QT_QPA_PLATFORM=wayland \
+    LANG="${LANG:-pt_PT.UTF-8}" calamares >"$registo" 2>&1
+fi
+
+sudo -n mv /etc/fstab.orig.calamares /etc/fstab 2>/dev/null
+exit 0

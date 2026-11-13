@@ -1,0 +1,8 @@
+#!/bin/sh
+# Clique num ícone da doca: se a aplicação já estiver aberta, traz a janela para a frente;
+# senão, abre-a. Uso: brisa-abrir <app_id> <comando> [argumentos...]
+id="$1"; shift
+if wlrctl toplevel focus "app_id:$id" 2>/dev/null; then
+  exit 0
+fi
+exec "$@"

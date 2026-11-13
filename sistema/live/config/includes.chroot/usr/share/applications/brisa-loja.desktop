@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Loja
+Name[en]=Store
+GenericName=Loja de aplicações
+GenericName[en]=App store
+Comment=Instalar aplicações no Brisa
+Comment[en]=Install apps on Brisa
+Exec=brisa-loja
+Icon=/usr/share/brisa/icones/loja.svg
+Terminal=false
+Categories=System;PackageManager;
+Keywords=instalar;aplicações;programas;software;install;apps;

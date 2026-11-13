@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Brisa
+Comment=Ambiente de trabalho do Brisa
+Exec=/usr/local/bin/brisa-sessao
+Type=Application
+DesktopNames=Brisa

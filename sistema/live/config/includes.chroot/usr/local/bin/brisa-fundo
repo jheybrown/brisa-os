@@ -1,0 +1,8 @@
+#!/bin/sh
+# Mostra o fundo de ecrã escolhido nas Definições (ou o predefinido).
+PADRAO=aurora
+nome=$(head -n 1 "$HOME/.config/brisa/fundo" 2>/dev/null)
+ficheiro="/usr/share/brisa/fundos/${nome:-$PADRAO}.png"
+[ -f "$ficheiro" ] || ficheiro="/usr/share/brisa/fundos/$PADRAO.png"
+pkill -x swaybg 2>/dev/null
+exec swaybg -m fill -i "$ficheiro"

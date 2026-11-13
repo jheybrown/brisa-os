@@ -1,0 +1,43 @@
+# Marca do Brisa no instalador.
+---
+componentName:   brisa
+
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 820px,600px
+windowPlacement: center
+
+strings:
+    productName:         Brisa
+    shortProductName:    Brisa
+    version:             1.0
+    shortVersion:        1.0
+    versionedName:       Brisa 1.0
+    shortVersionedName:  Brisa 1.0
+    # O nome da entrada de arranque mantém-se "Debian": é o que o carregador de arranque da base espera
+    bootloaderEntryName: Debian
+    productUrl:          https://www.debian.org
+    supportUrl:          https://www.debian.org/support
+    knownIssuesUrl:      https://bugs.debian.org
+    releaseNotesUrl:     https://www.debian.org/releases/trixie/releasenotes
+    donateUrl:           https://www.debian.org
+
+sidebar: widget
+navigation: widget
+
+images:
+    productLogo:         "logo.png"
+    productIcon:         "logo.png"
+    productWelcome:      "welcome.png"
+
+# Durante a instalação mostra uma imagem fixa
+slideshow:
+    - "welcome.png"
+slideshowAPI: -1
+
+style:
+   SidebarBackground:        "#0E1A3A"
+   SidebarText:              "#DDE3F5"
+   SidebarTextCurrent:       "#FFFFFF"
+   SidebarBackgroundCurrent: "#0A84FF"

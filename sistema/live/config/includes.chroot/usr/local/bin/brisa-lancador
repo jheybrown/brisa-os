@@ -1,0 +1,3 @@
+#!/bin/sh
+# Abre (ou fecha, se já estiver aberto) o ecrã de todas as aplicações.
+exec brisa-apps

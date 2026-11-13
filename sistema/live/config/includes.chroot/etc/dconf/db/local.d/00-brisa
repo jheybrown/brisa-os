@@ -1,0 +1,16 @@
+# Predefinições do Brisa para as aplicações GTK.
+# Em Wayland as aplicações leem estes valores daqui, e não do settings.ini.
+
+[org/gnome/desktop/wm/preferences]
+button-layout=':minimize,maximize,close'
+
+[org/gnome/desktop/interface]
+gtk-theme='Adwaita'
+icon-theme='Papirus'
+font-name='Inter 10.5'
+document-font-name='Inter 10.5'
+monospace-font-name='DejaVu Sans Mono 10'
+cursor-theme='Adwaita'
+cursor-size=24
+color-scheme='default'
+enable-animations=true

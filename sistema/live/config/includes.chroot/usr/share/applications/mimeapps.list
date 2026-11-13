@@ -1,0 +1,14 @@
+[Default Applications]
+application/x-ms-dos-executable=brisa-wine.desktop
+application/x-msdos-program=brisa-wine.desktop
+application/x-msdownload=brisa-wine.desktop
+application/vnd.microsoft.portable-executable=brisa-wine.desktop
+application/x-msi=brisa-wine.desktop
+inode/directory=thunar.desktop
+text/plain=org.xfce.mousepad.desktop
+application/pdf=org.gnome.Evince.desktop
+text/html=firefox-esr.desktop
+x-scheme-handler/http=firefox-esr.desktop
+x-scheme-handler/https=firefox-esr.desktop
+image/png=org.xfce.ristretto.desktop
+image/jpeg=org.xfce.ristretto.desktop

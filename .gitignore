@@ -1,0 +1,8 @@
+# Imagens do sistema: vão para a página Releases, não para o repositório (limite de 100 MB por ficheiro)
+*.iso
+
+# Ficheiros de trabalho locais
+.claude/
+sistema/previas/
+__pycache__/
+*.pyc

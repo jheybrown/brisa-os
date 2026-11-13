@@ -1,0 +1,13 @@
+# Brisa — avisos do sistema.
+font=Manrope 11
+background-color=#FFFFFFF2
+text-color=#1B2130
+border-color=#E4E8F1
+border-size=1
+border-radius=14
+padding=14
+margin=12
+width=340
+anchor=top-right
+default-timeout=6000
+max-visible=4

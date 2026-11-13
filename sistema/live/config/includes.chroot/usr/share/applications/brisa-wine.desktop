@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Aplicação Windows
+Comment=Abre programas e instaladores do Windows
+Exec=wine start /unix %f
+Icon=wine
+Terminal=false
+NoDisplay=true
+MimeType=application/x-ms-dos-executable;application/x-msdos-program;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;application/x-ms-shortcut;

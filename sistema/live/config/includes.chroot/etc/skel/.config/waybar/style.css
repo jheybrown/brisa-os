@@ -1,0 +1,97 @@
+/* Brisa 1.0 — layout Ilhas: ilhas escuras em cima e doca escura vertical à direita. */
+* {
+  font-family: Inter, FontAwesome, "Noto Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 0;
+  border: none;
+  box-shadow: none;
+}
+
+tooltip { background: rgba(20, 26, 48, 0.96); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; }
+tooltip label { color: #F2F4FA; font-weight: 600; font-size: 13px; padding: 1px 4px; }
+
+window#waybar { background: transparent; color: #F2F4FA; }
+
+/* ---------- Ilhas: cada grupo da barra de cima é uma cápsula de vidro escuro ---------- */
+.topo .modules-left,
+.topo .modules-center,
+.topo .modules-right {
+  background: rgba(22, 28, 52, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 19px;
+  padding: 0 6px;
+}
+.topo #custom-brisa,
+.topo #custom-instalar,
+.topo #custom-aplicacoes,
+.topo #custom-janelas,
+.topo #tray,
+.topo #wireplumber,
+.topo #battery,
+.topo #clock {
+  padding: 0 10px;
+  margin: 5px 1px;
+  border-radius: 13px;
+  color: #F2F4FA;
+}
+.topo #custom-brisa { font-weight: 800; font-size: 13.5px; }
+.topo #custom-aplicacoes { background: rgba(90, 160, 255, 0.22); color: #BFDBFF; }
+.topo #custom-janelas { color: #A9B2CC; font-weight: 500; }
+.topo #custom-brisa:hover,
+.topo #custom-aplicacoes:hover,
+.topo #custom-janelas:hover,
+.topo #wireplumber:hover,
+.topo #battery:hover,
+.topo #clock:hover { background: rgba(255, 255, 255, 0.12); color: #FFFFFF; }
+.topo #wireplumber { font-size: 14px; min-width: 18px; }
+.topo #wireplumber.muted { color: #8E95AA; }
+.topo #battery.warning { color: #FFC266; }
+.topo #battery.critical { color: #FF6B6B; }
+.topo #custom-instalar { background: #0A84FF; color: #FFFFFF; padding: 0 14px; }
+.topo #custom-instalar:hover { background: #2E97FF; }
+
+/* ---------- Doca vertical à direita, vidro escuro ---------- */
+.doca .modules-center {
+  background: rgba(22, 28, 52, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 26px;
+  padding: 8px 4px;
+}
+
+/* Ícones fixos: crescem ao passar o rato; o ponto à esquerda indica "aberta" */
+.doca #custom-d-ficheiros, .doca #custom-d-navegador, .doca #custom-d-writer, .doca #custom-d-calc,
+.doca #custom-d-notas, .doca #custom-d-calculadora, .doca #custom-d-loja, .doca #custom-d-definicoes,
+.doca #custom-d-lancador {
+  min-width: 66px; min-height: 56px; margin: 1px 0; padding: 0;
+  background-repeat: no-repeat; background-position: right center; background-size: 54px 48px;
+  transition: background-size 140ms ease-out, min-height 140ms ease-out;
+}
+.doca #custom-d-ficheiros:hover, .doca #custom-d-navegador:hover, .doca #custom-d-writer:hover, .doca #custom-d-calc:hover,
+.doca #custom-d-notas:hover, .doca #custom-d-calculadora:hover, .doca #custom-d-loja:hover, .doca #custom-d-definicoes:hover,
+.doca #custom-d-lancador:hover { background-size: 65px 58px; min-height: 64px; }
+.doca #custom-d-ficheiros   { background-image: url("/usr/share/brisa/icones/doca/ficheiros.svg"); }
+.doca #custom-d-navegador   { background-image: url("/usr/share/brisa/icones/doca/navegador.svg"); }
+.doca #custom-d-writer      { background-image: url("/usr/share/brisa/icones/doca/writer.svg"); }
+.doca #custom-d-calc        { background-image: url("/usr/share/brisa/icones/doca/calc.svg"); }
+.doca #custom-d-notas       { background-image: url("/usr/share/brisa/icones/doca/notas.svg"); }
+.doca #custom-d-calculadora { background-image: url("/usr/share/brisa/icones/doca/calculadora.svg"); }
+.doca #custom-d-loja        { background-image: url("/usr/share/brisa/icones/doca/loja.svg"); }
+.doca #custom-d-definicoes  { background-image: url("/usr/share/brisa/icones/doca/definicoes.svg"); }
+.doca #custom-d-lancador    { background-image: url("/usr/share/brisa/icones/doca/lancador.svg"); }
+.doca #custom-d-ficheiros.aberta   { background-image: url("/usr/share/brisa/icones/doca/ficheiros-aberto.svg"); }
+.doca #custom-d-navegador.aberta   { background-image: url("/usr/share/brisa/icones/doca/navegador-aberto.svg"); }
+.doca #custom-d-writer.aberta      { background-image: url("/usr/share/brisa/icones/doca/writer-aberto.svg"); }
+.doca #custom-d-calc.aberta        { background-image: url("/usr/share/brisa/icones/doca/calc-aberto.svg"); }
+.doca #custom-d-notas.aberta       { background-image: url("/usr/share/brisa/icones/doca/notas-aberto.svg"); }
+.doca #custom-d-calculadora.aberta { background-image: url("/usr/share/brisa/icones/doca/calculadora-aberto.svg"); }
+.doca #custom-d-loja.aberta        { background-image: url("/usr/share/brisa/icones/doca/loja-aberto.svg"); }
+.doca #custom-d-definicoes.aberta  { background-image: url("/usr/share/brisa/icones/doca/definicoes-aberto.svg"); }
+
+/* Outras aplicações abertas, por baixo de um separador */
+.doca #taskbar { margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.16); border-radius: 0; }
+.doca #taskbar.empty { margin: 0; padding: 0; border: none; }
+.doca #taskbar button { padding: 4px 6px; border-radius: 12px; background: transparent; }
+.doca #taskbar button image { transition: -gtk-icon-transform 140ms ease-out; }
+.doca #taskbar button:hover image { -gtk-icon-transform: scale(1.16) translateX(-4px); }
+.doca #taskbar button.active { background: rgba(255, 255, 255, 0.12); }

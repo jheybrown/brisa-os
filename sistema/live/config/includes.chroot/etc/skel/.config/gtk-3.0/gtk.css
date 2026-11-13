@@ -1,0 +1,41 @@
+/* Brisa 1.0 — janelas claras do layout Ilhas, por cima do tema Adwaita. */
+@define-color theme_selected_bg_color #0A84FF;
+@define-color theme_selected_fg_color #FFFFFF;
+@define-color accent_color #0A84FF;
+
+/* Cantos mais redondos; sombra funda na janela ativa, mais leve nas outras */
+decoration { border-radius: 14px; box-shadow: 0 22px 52px rgba(0, 0, 0, 0.40), 0 0 0 1px rgba(0, 0, 0, 0.16); }
+decoration:backdrop { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.10); }
+window.csd, window.csd > .background { border-radius: 14px; }
+
+/* Barra de título branca, com o título à esquerda do centro e os botões à direita */
+headerbar, .titlebar {
+  min-height: 42px;
+  padding: 0 10px 0 14px;
+  border-radius: 14px 14px 0 0;
+  background: #FFFFFF;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: none;
+}
+headerbar:backdrop, .titlebar:backdrop { background: #FAFAFB; }
+headerbar .title, .titlebar .title { font-weight: 600; color: #1D1D1F; }
+headerbar:backdrop .title { color: #8E8E93; }
+
+/* Botões redondos cinzentos: minimizar, maximizar, fechar */
+headerbar button.titlebutton, .titlebar button.titlebutton {
+  min-width: 24px; min-height: 24px;
+  padding: 0; margin: 0 0 0 6px;
+  border-radius: 50%;
+  border: none;
+  background: #ECEDF1;
+  color: #3A3F4F;
+  box-shadow: none; -gtk-icon-shadow: none; text-shadow: none;
+  -gtk-icon-transform: scale(0.75);
+}
+headerbar button.titlebutton:hover, .titlebar button.titlebutton:hover { background: #DCDEE5; }
+headerbar button.titlebutton.close:hover, .titlebar button.titlebutton.close:hover { background: #FF5F57; color: #FFFFFF; }
+headerbar:backdrop button.titlebutton, .titlebar:backdrop button.titlebutton { background: #F2F3F6; color: #9A9FB0; }
+
+/* Seleções e botões principais no azul do sistema */
+selection, *:selected { background-color: #0A84FF; color: #FFFFFF; }
+button.suggested-action { background: #0A84FF; color: #FFFFFF; border-color: #0071E3; }

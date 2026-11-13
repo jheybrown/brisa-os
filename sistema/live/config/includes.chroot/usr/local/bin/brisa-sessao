@@ -1,0 +1,49 @@
+#!/bin/sh
+# Arranca a sessão gráfica do Brisa (compositor Wayfire).
+export XDG_CURRENT_DESKTOP=Brisa
+export XDG_SESSION_DESKTOP=brisa
+export XDG_SESSION_TYPE=wayland
+export MOZ_ENABLE_WAYLAND=1
+export GDK_BACKEND=wayland,x11
+export QT_QPA_PLATFORM="wayland;xcb"
+export SDL_VIDEODRIVER=wayland
+export _JAVA_AWT_WM_NONREPARENTING=1
+export XCURSOR_THEME=Adwaita
+export XCURSOR_SIZE=24
+# Permite arrancar em máquinas virtuais e gráficas sem aceleração
+export WLR_RENDERER_ALLOW_SOFTWARE=1
+# O cursor desenhado por software só é preciso em máquinas virtuais; em hardware real é mais lento
+if systemd-detect-virt -q 2>/dev/null; then export WLR_NO_HARDWARE_CURSORS=1; fi
+
+# Contas criadas antes de existir a configuração do Brisa recebem-na no primeiro arranque
+if [ ! -f "$HOME/.config/wayfire.ini" ]; then
+  mkdir -p "$HOME/.config"
+  cp -rn /etc/skel/.config/. "$HOME/.config/"
+fi
+mkdir -p "$HOME/.config/brisa"
+
+# Pastas da conta que ficaram com outro dono (por exemplo criadas por um programa de
+# administrador) impedem aplicações como o Firefox de abrir: devolve-as ao utilizador.
+alheias=$(find "$HOME" -maxdepth 2 ! -user "$(id -u)" 2>/dev/null | head -n 50)
+if [ -n "$alheias" ] && sudo -n true 2>/dev/null; then
+  echo "$alheias" | while IFS= read -r p; do sudo -n chown -R "$(id -u):$(id -g)" "$p"; done
+fi
+
+# Idioma: o escolhido nas Definições tem prioridade sobre o do sistema
+if [ -s "$HOME/.config/brisa/idioma" ]; then
+  idioma=$(head -n 1 "$HOME/.config/brisa/idioma")
+  export LANG="$idioma"
+  base=${idioma%%.*}
+  export LANGUAGE="$base:${base%%_*}"
+  unset LC_ALL LC_MESSAGES
+fi
+
+# Teclado: enquanto o utilizador não escolher um nas Definições, usa o definido na instalação
+if [ ! -e "$HOME/.config/brisa/teclado" ] && [ -r /etc/default/keyboard ]; then
+  teclado=$(sed -n 's/^XKBLAYOUT="\?\([a-z,]*\)"\?.*/\1/p' /etc/default/keyboard | head -n 1)
+  if [ -n "$teclado" ]; then
+    sed -i "s/^xkb_layout *=.*/xkb_layout = $teclado/" "$HOME/.config/wayfire.ini"
+  fi
+fi
+
+exec wayfire >"${XDG_RUNTIME_DIR:-/tmp}/brisa-sessao.log" 2>&1

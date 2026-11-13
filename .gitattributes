@@ -1,0 +1,3 @@
+# Os scripts correm em Linux: guardar sempre com finais de linha Unix
+* text=auto eol=lf
+*.png binary

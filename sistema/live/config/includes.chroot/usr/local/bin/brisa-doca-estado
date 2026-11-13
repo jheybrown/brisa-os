@@ -1,0 +1,17 @@
+#!/bin/sh
+# Indica à doca se uma aplicação está aberta (mostra o ponto por baixo do ícone).
+# Uso: brisa-doca-estado <nome a mostrar> <app_id> [outro_app_id...]
+# Escreve uma linha JSON sempre que o estado muda, que é o formato que o Waybar espera.
+nome="$1"; shift
+anterior=""
+while :; do
+  estado=fechada
+  for id in "$@"; do
+    if wlrctl toplevel find "app_id:$id" 2>/dev/null; then estado=aberta; break; fi
+  done
+  if [ "$estado" != "$anterior" ]; then
+    printf '{"text": " ", "tooltip": "%s", "class": "%s"}\n' "$nome" "$estado"
+    anterior=$estado
+  fi
+  sleep 1.5
+done

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt" data-estilo="vidro" data-tema="claro" data-acento="azul" data-fundo="vidro" data-anim="sim">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brisa — protótipo do ambiente de trabalho</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/brisa.css">
+</head>
+<body>
+
+<!-- Fundo: desenhado em SVG, sem imagens nem desfoques -->
+<svg class="fundo" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" class="ceu-1"/><stop offset="1" class="ceu-2"/>
+    </linearGradient>
+    <filter id="f-xl" filterUnits="userSpaceOnUse" x="-400" y="-400" width="2240" height="1700"><feGaussianBlur stdDeviation="110"/></filter>
+  </defs>
+
+  <!-- Fundos simples: céu, astro e quatro ondas, coloridos por variáveis CSS -->
+  <g class="cena cena-ondas">
+    <rect width="1440" height="900" fill="url(#ceu)"/>
+    <circle class="astro" cx="1060" cy="330" r="88"/>
+    <path class="onda o1" d="M0 470 C 180 410 330 520 520 470 S 860 400 1060 460 1300 500 1440 440 V900 H0Z"/>
+    <path class="onda o2" d="M0 570 C 200 520 380 620 600 570 S 940 500 1140 570 1340 600 1440 560 V900 H0Z"/>
+    <path class="onda o3" d="M0 670 C 220 620 420 730 660 680 S 1000 610 1200 680 1360 700 1440 670 V900 H0Z"/>
+    <path class="onda o4" d="M0 780 C 240 730 460 830 720 790 S 1080 730 1260 790 1380 800 1440 780 V900 H0Z"/>
+  </g>
+
+  <!-- Vidro: manchas de cor suaves -->
+  <g class="cena cena-vidro">
+    <rect width="1440" height="900" fill="#EEF2FF"/>
+    <g filter="url(#f-xl)">
+      <ellipse cx="260" cy="200" rx="420" ry="300" fill="#8FC3FF"/>
+      <ellipse cx="1200" cy="180" rx="380" ry="280" fill="#CDB4FF"/>
+      <ellipse cx="1050" cy="760" rx="460" ry="280" fill="#FFC4A3"/>
+      <ellipse cx="240" cy="820" rx="340" ry="220" fill="#A9EEDA"/>
+    </g>
+    <path d="M-100 620 C 300 420 700 760 1540 380 V500 C 800 880 300 560 -100 780Z" fill="#fff" opacity=".28"/>
+    <path d="M-100 300 C 400 120 800 420 1540 160 V230 C 800 500 400 190 -100 380Z" fill="#fff" opacity=".2"/>
+  </g>
+</svg>
+
+<header class="barra" role="banner">
+  <button class="barra-btn marca" id="btn-menu" data-abre="menu-brisa" aria-haspopup="true" aria-expanded="false">
+    <span class="marca-icone" id="marca-icone"></span><span>Brisa</span>
+  </button>
+  <span class="barra-app" id="barra-app">Ambiente de trabalho</span>
+  <button class="barra-btn" id="btn-janelas" data-abre="menu-janelas" aria-haspopup="true" aria-expanded="false">Janelas</button>
+  <span class="barra-espaco"></span>
+  <span class="barra-estado" id="barra-mem" title="Memória em uso (simulada)"></span>
+  <button class="barra-btn" id="btn-relogio" data-abre="painel-rapido" aria-haspopup="true" aria-expanded="false"></button>
+</header>
+
+<div class="painel menu" id="menu-brisa" role="menu" hidden>
+  <button role="menuitem" data-app="sobre">Sobre o Brisa</button>
+  <button role="menuitem" data-app="definicoes">Definições</button>
+  <button role="menuitem" data-app="monitor">Monitor do sistema</button>
+  <hr>
+  <button role="menuitem" data-acao="fechar-tudo">Fechar todas as janelas</button>
+</div>
+
+<div class="painel menu" id="menu-janelas" role="menu" hidden>
+  <button role="menuitem" data-acao="vista">Vista geral</button>
+  <button role="menuitem" data-acao="lado-a-lado">Lado a lado</button>
+  <button role="menuitem" data-acao="cascata">Em cascata</button>
+  <hr>
+  <button role="menuitem" data-acao="ambiente">Mostrar o ambiente de trabalho</button>
+</div>
+
+<div class="painel rapido" id="painel-rapido" hidden>
+  <p class="rapido-data" id="rapido-data"></p>
+  <div class="rapido-linha">
+    <span>Tema</span>
+    <div class="segmentos" id="rapido-tema">
+      <button data-tema="claro">Claro</button>
+      <button data-tema="escuro">Escuro</button>
+    </div>
+  </div>
+  <div class="rapido-linha">
+    <span>Memória</span>
+    <span id="rapido-mem"></span>
+  </div>
+  <div class="medidor"><i id="rapido-mem-barra"></i></div>
+</div>
+
+<main class="area" id="area" aria-label="Ambiente de trabalho"></main>
+
+<div class="painel lancador" id="lancador" hidden>
+  <input type="search" id="lancador-busca" placeholder="Procurar uma aplicação" aria-label="Procurar uma aplicação" autocomplete="off">
+  <div class="lancador-grelha" id="lancador-grelha"></div>
+  <p class="lancador-vazio" id="lancador-vazio" hidden>Nenhuma aplicação com esse nome.</p>
+</div>
+
+<nav class="doca" id="doca" aria-label="Aplicações"></nav>
+
+<script src="js/sistema.js"></script>
+<script src="js/apps.js"></script>
+</body>
+</html>

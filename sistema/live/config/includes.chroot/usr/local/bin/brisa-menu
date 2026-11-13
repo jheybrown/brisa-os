@@ -1,0 +1,30 @@
+#!/bin/sh
+# Menu do sistema, aberto pelo botão "Brisa" da barra superior.
+case "${LANG:-pt}" in
+  pt*)
+    SOBRE="Sobre o Brisa"; DEFS="Definições"; LOJA="Loja de aplicações"
+    SAIR="Terminar sessão"; SUSP="Suspender"; REIN="Reiniciar"; DESL="Desligar"
+    SOBRE_TXT="Base Debian 13. Memória em uso:" ;;
+  *)
+    SOBRE="About Brisa"; DEFS="Settings"; LOJA="App store"
+    SAIR="Log out"; SUSP="Suspend"; REIN="Restart"; DESL="Shut down"
+    SOBRE_TXT="Based on Debian 13. Memory in use:" ;;
+esac
+
+# Um segundo clique no botão fecha o menu
+if pkill -x fuzzel 2>/dev/null; then exit 0; fi
+
+escolha=$(printf '%s\n' "$SOBRE" "$DEFS" "$LOJA" "$SAIR" "$SUSP" "$REIN" "$DESL" \
+  | fuzzel --dmenu --lines 7 --width 26 --anchor top-left --x-margin 12 --y-margin 8 --prompt "")
+
+case "$escolha" in
+  "$SOBRE")
+    mem=$(free -m | awk '/^Mem/ {print $3 " MB / " $2 " MB"}')
+    notify-send "Brisa 1.0" "$SOBRE_TXT $mem." ;;
+  "$DEFS") brisa-definicoes ;;
+  "$LOJA") brisa-loja ;;
+  "$SAIR") loginctl terminate-session "$XDG_SESSION_ID" ;;
+  "$SUSP") systemctl suspend ;;
+  "$REIN") systemctl reboot ;;
+  "$DESL") systemctl poweroff ;;
+esac

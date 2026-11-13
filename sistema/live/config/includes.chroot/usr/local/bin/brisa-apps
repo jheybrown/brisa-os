@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""Aplicações do Brisa: todas as aplicações numa grelha em ecrã inteiro, ao estilo do Launchpad.
+
+Escrever filtra a lista (Enter abre a primeira). Fecha com Esc, ao clicar fora dos ícones,
+ao abrir uma aplicação, ou ao chamar o programa outra vez (botão da doca ou Super+Espaço).
+"""
+import locale
+import os
+
+import gi
+
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
+
+PT = os.environ.get('LANG', 'pt').lower().startswith('pt')
+FUNDOS = '/usr/share/brisa/fundos'
+# Entradas secundárias que só baralham quem procura uma aplicação (continuam acessíveis dentro das apps)
+ESCONDIDAS = {'brisa-apps.desktop', 'brisa-instalar.desktop', 'thunar-settings.desktop', 'thunar-bulk-rename.desktop',
+              'org.xfce.mousepad-settings.desktop', 'foot-server.desktop', 'footclient.desktop', 'wcm.desktop',
+              'libreoffice-startcenter.desktop', 'debian-xterm.desktop', 'debian-uxterm.desktop'}
+
+
+def t(pt, en):
+    return pt if PT else en
+
+
+def fundo_desfocado():
+    try:
+        nome = open(os.path.expanduser('~/.config/brisa/fundo'), encoding='utf-8').readline().strip() or 'aurora'
+    except OSError:
+        nome = 'aurora'
+    for n in (nome, 'aurora'):
+        caminho = f'{FUNDOS}/{n}-desfocado.png'
+        if os.path.exists(caminho):
+            return caminho, n
+    return '', nome
+
+
+def ordem(texto):
+    try:
+        return locale.strxfrm(texto.lower())
+    except Exception:
+        return texto.lower()
+
+
+class Apps(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id='pt.brisa.Apps', flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.janela = None
+        self.teve_foco = False
+
+    def do_activate(self):
+        if self.janela:  # chamado outra vez enquanto está aberto: fecha
+            self.fechar()
+            return
+        try:
+            locale.setlocale(locale.LC_ALL, '')
+        except locale.Error:
+            pass
+        imagem, nome = fundo_desfocado()
+        escuro = nome in ('aurora', 'orbita', 'seda')
+        css = f'''
+window.apps {{ background-color: {'#0B1026' if escuro else '#DDE6F7'}; {f"background-image: url('{imagem}');" if imagem else ''} background-size: cover; background-position: center; }}
+.apps-veu {{ background-color: rgba({'10, 18, 48, 0.35' if escuro else '255, 255, 255, 0.30'}); }}
+entry.apps-busca {{ min-height: 34px; border-radius: 10px; font-size: 15px; box-shadow: none;
+  background: rgba(255, 255, 255, 0.78); border: 1px solid rgba(255, 255, 255, 0.95); color: #1B2130; }}
+button.apps-app {{ background: transparent; border: none; box-shadow: none; padding: 10px 6px; border-radius: 18px; }}
+button.apps-app:hover, button.apps-app:focus {{ background: rgba(255, 255, 255, {'0.16' if escuro else '0.42'}); }}
+.apps-nome {{ color: {'#FFFFFF' if escuro else '#141B33'}; font-size: 13.5px; font-weight: 600; }}
+.apps-vazio {{ color: {'#FFFFFF' if escuro else '#141B33'}; font-size: 16px; }}
+'''
+        estilo = Gtk.CssProvider()
+        estilo.load_from_data(css.encode())
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), estilo, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        j = Gtk.ApplicationWindow(application=self, title=t('Aplicações', 'Applications'))
+        j.get_style_context().add_class('apps')
+        j.set_decorated(False)
+        j.fullscreen()
+        j.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        j.connect('key-press-event', self.ao_teclar)
+        j.connect('button-press-event', lambda *_: self.fechar())  # clique que nenhum ícone apanhou
+        j.connect('focus-in-event', self.ao_ganhar_foco)
+        j.connect('focus-out-event', self.ao_perder_foco)
+        self.janela = j
+
+        veu = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=30)
+        veu.get_style_context().add_class('apps-veu')
+        j.add(veu)
+
+        self.busca = Gtk.SearchEntry(placeholder_text=t('Procurar', 'Search'))
+        self.busca.get_style_context().add_class('apps-busca')
+        self.busca.set_halign(Gtk.Align.CENTER)
+        self.busca.set_size_request(300, -1)
+        self.busca.set_margin_top(48)
+        self.busca.connect('search-changed', lambda *_: self.preencher())
+        self.busca.connect('activate', lambda *_: self.abrir_primeira())
+        veu.pack_start(self.busca, False, False, 0)
+
+        rolo = Gtk.ScrolledWindow()
+        rolo.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        rolo.set_capture_button_press(False)
+        self.grelha = Gtk.Grid(column_spacing=26, row_spacing=20, halign=Gtk.Align.CENTER, valign=Gtk.Align.START)
+        self.grelha.set_margin_bottom(130)  # não fica por baixo da doca
+        rolo.add(self.grelha)
+        veu.pack_start(rolo, True, True, 0)
+
+        geo = Gdk.Display.get_default().get_monitor(0).get_geometry()
+        self.colunas = max(4, min(8, (geo.width - 160) // 150))
+        self.apps = sorted((a for a in Gio.AppInfo.get_all()
+                            if a.should_show() and (a.get_id() or '') not in ESCONDIDAS),
+                           key=lambda a: ordem(a.get_display_name() or a.get_name() or ''))
+        self.visiveis = []
+        self.preencher()
+        j.show_all()
+        self.busca.grab_focus()
+
+    def corresponde(self, app, q):
+        if not q:
+            return True
+        textos = [app.get_display_name() or '', app.get_name() or '', app.get_description() or '']
+        if isinstance(app, Gio.DesktopAppInfo):
+            textos += [app.get_generic_name() or ''] + list(app.get_keywords() or [])
+        return any(q in x.lower() for x in textos)
+
+    def preencher(self):
+        for filho in self.grelha.get_children():
+            self.grelha.remove(filho)
+        q = self.busca.get_text().strip().lower()
+        self.visiveis = [a for a in self.apps if self.corresponde(a, q)]
+        if not self.visiveis:
+            vazio = Gtk.Label(label=t('Nenhuma aplicação com esse nome.', 'No app with that name.'))
+            vazio.get_style_context().add_class('apps-vazio')
+            self.grelha.attach(vazio, 0, 0, 1, 1)
+        for i, app in enumerate(self.visiveis):
+            caixa = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            icone = Gtk.Image.new_from_gicon(app.get_icon() or Gio.ThemedIcon.new('application-x-executable'), Gtk.IconSize.DIALOG)
+            icone.set_pixel_size(72)
+            nome = Gtk.Label(label=app.get_display_name() or app.get_name())
+            nome.get_style_context().add_class('apps-nome')
+            nome.set_ellipsize(Pango.EllipsizeMode.END)
+            nome.set_max_width_chars(14)
+            nome.set_width_chars(14)
+            caixa.pack_start(icone, False, False, 0)
+            caixa.pack_start(nome, False, False, 0)
+            b = Gtk.Button()
+            b.get_style_context().add_class('apps-app')
+            b.set_tooltip_text(app.get_description() or None)
+            b.add(caixa)
+            b.connect('clicked', lambda _b, a=app: self.abrir(a))
+            self.grelha.attach(b, i % self.colunas, i // self.colunas, 1, 1)
+        self.grelha.show_all()
+
+    def abrir(self, app):
+        try:
+            app.launch([], Gdk.Display.get_default().get_app_launch_context())
+        except GLib.Error:
+            pass
+        self.fechar()
+
+    def abrir_primeira(self):
+        if self.visiveis:
+            self.abrir(self.visiveis[0])
+
+    def ao_teclar(self, _janela, ev):
+        if ev.keyval == Gdk.KEY_Escape:
+            self.fechar()
+            return True
+        if not self.busca.has_focus():
+            self.busca.grab_focus_without_selecting()
+        return False
+
+    def ao_ganhar_foco(self, *_):
+        self.teve_foco = True
+        return False
+
+    def ao_perder_foco(self, *_):
+        # Fecha quando outra janela passa a ter o foco, como o Launchpad
+        if self.teve_foco:
+            GLib.timeout_add(120, lambda: (self.janela and not self.janela.is_active() and self.fechar(), False)[1])
+        return False
+
+    def fechar(self):
+        if self.janela:
+            j, self.janela = self.janela, None
+            j.destroy()
+
+
+if __name__ == '__main__':
+    GLib.set_prgname('brisa-apps')
+    Apps().run(None)

@@ -1,0 +1,406 @@
+#!/usr/bin/env python3
+"""Loja do Brisa: um catálogo escolhido de aplicações, instaladas com um clique.
+
+As aplicações vêm do Flathub e são instaladas na conta do utilizador, por isso
+não é precisa palavra-passe de administrador. Os textos seguem o idioma da sessão.
+"""
+import os
+import shutil
+import subprocess
+import threading
+
+import gi
+
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+gi.require_version('Flatpak', '1.0')
+from gi.repository import Flatpak, Gdk, Gio, GLib, Gtk  # noqa: E402
+
+FLATHUB = 'https://dl.flathub.org/repo/flathub.flatpakrepo'
+PT = os.environ.get('LANG', 'pt').lower().startswith('pt')
+
+
+def t(pt, en):
+    return pt if PT else en
+
+
+# (identificador no Flathub, nome, descrição PT, descrição EN, categoria, cor)
+CATALOGO = [
+    ('com.google.Chrome', 'Google Chrome', 'Navegador da Google', 'Web browser by Google', 'internet', '#E8453C'),
+    ('org.chromium.Chromium', 'Chromium', 'Navegador de código aberto, base do Chrome', 'Open-source browser that Chrome is built on', 'internet', '#4C8BF5'),
+    ('org.mozilla.Thunderbird', 'Thunderbird', 'Correio eletrónico e calendário', 'Email and calendar', 'internet', '#2F6FDE'),
+    ('org.telegram.desktop', 'Telegram', 'Mensagens e chamadas', 'Messaging and calls', 'internet', '#2AA3E0'),
+    ('us.zoom.Zoom', 'Zoom', 'Reuniões por vídeo', 'Video meetings', 'internet', '#2D8CFF'),
+    ('com.discordapp.Discord', 'Discord', 'Conversa por voz e texto em comunidades', 'Voice and text chat for communities', 'internet', '#5865F2'),
+    ('org.qbittorrent.qBittorrent', 'qBittorrent', 'Transferência de ficheiros por torrent', 'Torrent file downloads', 'internet', '#3A7BD5'),
+    ('org.onlyoffice.desktopeditors', 'ONLYOFFICE', 'Documentos, folhas de cálculo e apresentações compatíveis com Microsoft Office', 'Documents, spreadsheets and slides compatible with Microsoft Office', 'escritorio', '#E36A2E'),
+    ('org.videolan.VLC', 'VLC', 'Leitor de vídeo e música que abre quase tudo', 'Video and music player that opens almost anything', 'multimedia', '#F08A1C'),
+    ('com.spotify.Client', 'Spotify', 'Música e podcasts em linha', 'Online music and podcasts', 'multimedia', '#1DB954'),
+    ('org.audacityteam.Audacity', 'Audacity', 'Gravar e editar áudio', 'Record and edit audio', 'multimedia', '#2E5FD0'),
+    ('com.obsproject.Studio', 'OBS Studio', 'Gravar o ecrã e transmitir em direto', 'Screen recording and live streaming', 'multimedia', '#3B3F4A'),
+    ('org.kde.kdenlive', 'Kdenlive', 'Editar vídeo', 'Video editing', 'multimedia', '#527EB2'),
+    ('org.gimp.GIMP', 'GIMP', 'Editar fotografias e imagens', 'Photo and image editing', 'criacao', '#8A6F4E'),
+    ('org.inkscape.Inkscape', 'Inkscape', 'Desenho vetorial', 'Vector drawing', 'criacao', '#2B2B2B'),
+    ('org.kde.krita', 'Krita', 'Pintura e ilustração digital', 'Digital painting and illustration', 'criacao', '#C2399B'),
+    ('com.visualstudio.code', 'Visual Studio Code', 'Editor de código', 'Code editor', 'programacao', '#1F8AD2'),
+    ('com.usebottles.bottles', 'Bottles', 'Gerir e instalar aplicações Windows em ambientes separados', 'Manage and install Windows apps in separate environments', 'windows', '#D94F4F'),
+    ('com.valvesoftware.Steam', 'Steam', 'Loja e biblioteca de jogos', 'Game store and library', 'jogos', '#1B2838'),
+]
+CATEGORIAS = [
+    ('todas', t('Todas', 'All')), ('internet', 'Internet'), ('escritorio', t('Escritório', 'Office')),
+    ('multimedia', t('Multimédia', 'Media')), ('criacao', t('Criação', 'Creative')),
+    ('programacao', t('Programação', 'Coding')), ('windows', 'Windows'), ('jogos', t('Jogos', 'Games')),
+]
+
+CSS = b"""
+window.loja { background: #F3F5FA; }
+.loja-topo { padding: 14px 18px 10px; }
+.loja-busca { min-height: 36px; border-radius: 10px; }
+.loja-cats { padding: 0 14px 8px; }
+.loja-cats flowboxchild { padding: 2px; }
+.loja-cat { border-radius: 16px; padding: 4px 13px; border: none; background: #E4E8F1; color: #1B2130; box-shadow: none; font-weight: 600; }
+.loja-cat:checked { background: #2F7BF6; color: #FFFFFF; }
+list.loja-lista { background: transparent; }
+list.loja-lista row { padding: 0; margin: 0 18px 8px; border-radius: 14px; background: #FFFFFF; border: 1px solid rgba(20, 30, 60, 0.12); }
+list.loja-lista row:selected { background: #FFFFFF; color: inherit; }
+.loja-cartao { padding: 12px 14px; }
+.loja-letra { min-width: 44px; min-height: 44px; border-radius: 12px; color: #FFFFFF; font-weight: 800; font-size: 19px; }
+.loja-nome { font-weight: 700; font-size: 15px; color: #1B2130; }
+.loja-desc, .loja-estado { color: #454E63; font-size: 13.5px; }
+.loja-estado.erro { color: #B3261E; font-weight: 600; }
+.loja-acao { border-radius: 9px; padding: 6px 16px; font-weight: 700; min-width: 86px; }
+.loja-acao.instalar { background: #2F7BF6; color: #FFFFFF; border-color: #1F66DB; box-shadow: none; text-shadow: none; }
+.loja-acao.instalar:hover { background: #1F66DB; }
+.loja-rodape { padding: 8px 18px 12px; color: #454E63; font-size: 13px; }
+"""
+
+
+def correr(args):
+    """Corre um comando e devolve (código de saída, texto)."""
+    try:
+        r = subprocess.run(args, capture_output=True, text=True)
+        return r.returncode, (r.stdout + r.stderr).strip()
+    except OSError as e:
+        return 1, str(e)
+
+
+def instalacao():
+    """A instalação Flatpak da conta do utilizador (não precisa de palavra-passe)."""
+    return Flatpak.Installation.new_user(None)
+
+
+def instaladas():
+    try:
+        return {r.get_name() for r in instalacao().list_installed_refs_by_kind(Flatpak.RefKind.APP, None)}
+    except GLib.Error:
+        return set()
+
+
+def livre(caminho):
+    """Espaço livre, em bytes, no disco onde fica a pasta (ou a pasta-mãe mais próxima que exista)."""
+    while caminho and not os.path.exists(caminho):
+        caminho = os.path.dirname(caminho)
+    s = os.statvfs(caminho or '/')
+    return s.f_bavail * s.f_frsize
+
+
+def tamanho(b):
+    if b >= 1e9:
+        texto = f'{b / 1e9:.1f} GB'
+    else:
+        texto = f'{max(b, 1e6) / 1e6:.0f} MB'
+    return texto.replace('.', ',') if PT else texto
+
+
+def explicar(texto):
+    """Transforma a saída de erro do Flatpak numa frase que o utilizador perceba."""
+    baixo = texto.lower()
+    if 'no space' in baixo or 'not enough disk space' in baixo or 'min-free-space' in baixo:
+        return t('Não há espaço livre suficiente. Em modo de experimentação o espaço é a memória do computador; '
+                 'instale o Brisa no disco para instalar aplicações grandes.',
+                 'There is not enough free space. In try-out mode the space is the computer\'s memory; '
+                 'install Brisa to disk to install large apps.')
+    if any(p in baixo for p in ('could not resolve', 'resolve host', 'network', 'timed out', 'connection', 'unable to connect')):
+        return t('Não foi possível ligar ao Flathub. Verifique a ligação à Internet e tente de novo.',
+                 'Could not reach Flathub. Check the Internet connection and try again.')
+    ultima = (texto.splitlines() or [t('erro desconhecido', 'unknown error')])[-1]
+    return t('A operação falhou. Mensagem do sistema: ', 'The operation failed. System message: ') + ultima
+
+
+class Linha(Gtk.ListBoxRow):
+    def __init__(self, loja, ident, nome, desc_pt, desc_en, categoria, cor):
+        super().__init__(activatable=False, selectable=False)
+        self.loja, self.ident, self.nome, self.categoria = loja, ident, nome, categoria
+        self.desc = t(desc_pt, desc_en)
+        self.ocupada = False
+
+        caixa = Gtk.Box(spacing=14)
+        caixa.get_style_context().add_class('loja-cartao')
+
+        letra = Gtk.Label(label=nome[0])
+        letra.get_style_context().add_class('loja-letra')
+        letra.set_valign(Gtk.Align.CENTER)
+        estilo = Gtk.CssProvider()
+        estilo.load_from_data(f'label {{ background: {cor}; }}'.encode())
+        letra.get_style_context().add_provider(estilo, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1)
+        caixa.pack_start(letra, False, False, 0)
+
+        textos = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        textos.set_valign(Gtk.Align.CENTER)
+        for texto, classe in ((nome, 'loja-nome'), (self.desc, 'loja-desc')):
+            r = Gtk.Label(label=texto, xalign=0)
+            r.set_line_wrap(True)
+            r.get_style_context().add_class(classe)
+            textos.pack_start(r, False, False, 0)
+        self.estado = Gtk.Label(xalign=0)
+        self.estado.set_line_wrap(True)
+        self.estado.set_selectable(True)
+        self.estado.get_style_context().add_class('loja-estado')
+        self.estado.set_no_show_all(True)
+        textos.pack_start(self.estado, False, False, 0)
+        self.barra = Gtk.ProgressBar()
+        self.barra.set_no_show_all(True)
+        textos.pack_start(self.barra, False, False, 2)
+        caixa.pack_start(textos, True, True, 0)
+
+        botoes = Gtk.Box(spacing=6)
+        botoes.set_valign(Gtk.Align.CENTER)
+        self.remover = Gtk.Button(label=t('Remover', 'Remove'))
+        self.remover.get_style_context().add_class('loja-acao')
+        self.remover.set_no_show_all(True)
+        self.remover.connect('clicked', lambda *_: self.executar('remover'))
+        self.acao = Gtk.Button()
+        self.acao.get_style_context().add_class('loja-acao')
+        self.acao.connect('clicked', self.ao_clicar)
+        botoes.pack_start(self.remover, False, False, 0)
+        botoes.pack_start(self.acao, False, False, 0)
+        caixa.pack_start(botoes, False, False, 0)
+
+        self.add(caixa)
+        self.atualizar()
+
+    @property
+    def instalada(self):
+        return self.ident in self.loja.instaladas
+
+    def atualizar(self):
+        ctx = self.acao.get_style_context()
+        if self.ocupada:
+            self.acao.set_label(t('Cancelar', 'Cancel'))
+            ctx.remove_class('instalar')
+        elif self.instalada:
+            self.acao.set_label(t('Abrir', 'Open'))
+            ctx.remove_class('instalar')
+        else:
+            self.acao.set_label(t('Instalar', 'Install'))
+            ctx.add_class('instalar')
+        self.remover.set_visible(self.instalada and not self.ocupada)
+
+    def dizer(self, texto, erro=False):
+        self.estado.set_text(texto)
+        self.estado.set_visible(bool(texto))
+        ctx = self.estado.get_style_context()
+        (ctx.add_class if erro else ctx.remove_class)('erro')
+        return False
+
+    def ao_clicar(self, *_):
+        if self.ocupada:
+            self.cancelar.cancel()
+            self.acao.set_sensitive(False)
+        elif self.instalada:
+            subprocess.Popen(['flatpak', 'run', self.ident], start_new_session=True)
+        else:
+            self.executar('instalar')
+
+    def progresso(self, feito, total):
+        if total > 0:
+            self.barra.set_fraction(min(feito / total, 1.0))
+            self.dizer(t(f'A transferir {tamanho(feito)} de {tamanho(total)}.',
+                         f'Downloading {tamanho(feito)} of {tamanho(total)}.'))
+        else:
+            self.barra.pulse()
+        return False
+
+    def executar(self, operacao):
+        instalar = operacao == 'instalar'
+        self.ocupada = True
+        self.cancelar = Gio.Cancellable()
+        self.atualizar()
+        self.acao.set_sensitive(True)
+        self.barra.set_fraction(0)
+        self.barra.set_visible(True)
+        self.dizer(t('A calcular o tamanho.', 'Working out the size.') if instalar else t('A remover.', 'Removing.'))
+        estado = {'total': 0, 'feito': 0, 'espaco': None}
+        ref = f'app/{self.ident}/x86_64/stable'
+
+        def pronto(tr):
+            ops = tr.get_operations()
+            estado['total'] = sum(o.get_download_size() for o in ops)
+            ocupar = sum(o.get_installed_size() for o in ops)
+            disponivel = livre(instalacao().get_path().get_path())
+            if instalar and ocupar > disponivel * 0.95:
+                estado['espaco'] = (ocupar, disponivel)
+                return False
+            if instalar:
+                GLib.idle_add(self.dizer, t(f'Vai transferir {tamanho(estado["total"])} e ocupar {tamanho(ocupar)}.',
+                                            f'Will download {tamanho(estado["total"])} and use {tamanho(ocupar)}.'))
+            return True
+
+        def nova_operacao(_tr, _op, prog):
+            base = estado['feito']
+            prog.set_update_frequency(300)
+            prog.connect('changed', lambda p: GLib.idle_add(self.progresso, base + p.get_bytes_transferred(), estado['total']))
+
+        def operacao_feita(_tr, op, _commit, _resultado):
+            estado['feito'] += op.get_download_size()
+
+        def trabalho():
+            erro = None
+            try:
+                if instalar:
+                    codigo, texto = self.loja.garantir_flathub()
+                    if codigo != 0:
+                        raise RuntimeError(texto)
+                tr = Flatpak.Transaction.new_for_installation(instalacao(), self.cancelar)
+                tr.set_no_interaction(True)
+                if instalar:
+                    tr.add_install('flathub', ref, None)
+                else:
+                    tr.add_uninstall(ref)
+                tr.connect('ready', pronto)
+                tr.connect('new-operation', nova_operacao)
+                tr.connect('operation-done', operacao_feita)
+                tr.connect('choose-remote-for-ref', lambda *_: 0)
+                tr.run(self.cancelar)
+            except (GLib.Error, RuntimeError) as e:
+                erro = getattr(e, 'message', None) or str(e)
+            GLib.idle_add(fim, erro)
+
+        def fim(erro):
+            self.barra.set_visible(False)
+            self.ocupada = False
+            self.acao.set_sensitive(True)
+            self.loja.instaladas = instaladas()
+            if estado['espaco']:
+                ocupar, disponivel = estado['espaco']
+                ao_vivo = os.path.isdir('/run/live')
+                self.dizer(t(f'Não há espaço: precisa de {tamanho(ocupar)} e só há {tamanho(disponivel)} livres.'
+                             + (' Em modo de experimentação o espaço é a memória do computador; instale o Brisa no disco.'
+                                if ao_vivo else ''),
+                             f'Not enough space: it needs {tamanho(ocupar)} and only {tamanho(disponivel)} are free.'
+                             + (" In try-out mode the space is the computer's memory; install Brisa to disk."
+                                if ao_vivo else '')),
+                           erro=True)
+            elif self.cancelar.is_cancelled():
+                self.dizer(t('Instalação cancelada.', 'Installation cancelled.'))
+            elif erro:
+                self.dizer(explicar(erro), erro=True)
+            else:
+                self.dizer(t('Instalada. Também aparece em Aplicações.', 'Installed. It also shows up in Applications.')
+                           if instalar else '')
+            self.atualizar()
+            return False
+
+        threading.Thread(target=trabalho, daemon=True).start()
+
+
+class Loja(Gtk.Window):
+    def __init__(self):
+        super().__init__(title=t('Loja', 'Store'))
+        self.set_default_size(720, 660)
+        self.get_style_context().add_class('loja')
+        self.instaladas = instaladas()
+        self.categoria = 'todas'
+        self._flathub_ok = False
+
+        estilo = Gtk.CssProvider()
+        estilo.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), estilo, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+        raiz = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        self.add(raiz)
+
+        topo = Gtk.Box()
+        topo.get_style_context().add_class('loja-topo')
+        self.busca = Gtk.SearchEntry(placeholder_text=t('Procurar uma aplicação', 'Search for an app'))
+        self.busca.get_style_context().add_class('loja-busca')
+        self.busca.connect('search-changed', lambda *_: self.lista.invalidate_filter())
+        topo.pack_start(self.busca, True, True, 0)
+        raiz.pack_start(topo, False, False, 0)
+
+        # As categorias passam para a linha seguinte quando não cabem, em vez de ficarem cortadas
+        cats = Gtk.FlowBox()
+        cats.set_selection_mode(Gtk.SelectionMode.NONE)
+        cats.set_max_children_per_line(len(CATEGORIAS))
+        cats.set_column_spacing(2)
+        cats.set_row_spacing(2)
+        cats.get_style_context().add_class('loja-cats')
+        primeiro = None
+        for chave, nome in CATEGORIAS:
+            b = Gtk.RadioButton.new_with_label_from_widget(primeiro, nome)
+            b.set_mode(False)
+            b.get_style_context().add_class('loja-cat')
+            b.connect('toggled', self.ao_escolher_categoria, chave)
+            primeiro = primeiro or b
+            cats.add(b)
+        raiz.pack_start(cats, False, False, 0)
+
+        self.lista = Gtk.ListBox()
+        self.lista.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.lista.get_style_context().add_class('loja-lista')
+        self.lista.set_filter_func(self.filtrar)
+        vazio = Gtk.Label(label=t('Nenhuma aplicação encontrada. Experimente outra palavra ou a categoria "Todas".',
+                                  'No apps found. Try another word or the "All" category.'))
+        vazio.get_style_context().add_class('loja-desc')
+        vazio.set_margin_top(40)
+        vazio.show()
+        self.lista.set_placeholder(vazio)
+        for item in CATALOGO:
+            self.lista.add(Linha(self, *item))
+        rolo = Gtk.ScrolledWindow()
+        rolo.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        rolo.add(self.lista)
+        raiz.pack_start(rolo, True, True, 0)
+
+        rodape = Gtk.Label(xalign=0)
+        rodape.set_line_wrap(True)
+        rodape.get_style_context().add_class('loja-rodape')
+        if not shutil.which('flatpak'):
+            rodape.set_text(t('O Flatpak não está instalado neste sistema, por isso a Loja não consegue instalar aplicações.',
+                              'Flatpak is not installed on this system, so the Store cannot install apps.'))
+        elif os.path.isdir('/run/live'):
+            rodape.set_text(t('Está em modo de experimentação: o que instalar fica só na memória e desaparece ao desligar. '
+                              'Aplicações grandes podem não caber; instale o Brisa no disco para as usar.',
+                              'You are in try-out mode: anything you install lives in memory and is gone after shutdown. '
+                              'Large apps may not fit; install Brisa to disk to use them.'))
+        else:
+            rodape.set_text(t('As aplicações vêm do Flathub e são instaladas só na sua conta.',
+                              'Apps come from Flathub and are installed for your account only.'))
+        raiz.pack_start(rodape, False, False, 0)
+
+    def garantir_flathub(self):
+        if self._flathub_ok:
+            return 0, ''
+        correr(['flatpak', 'config', '--user', '--set', 'languages', 'pt;en'])
+        codigo, texto = correr(['flatpak', 'remote-add', '--user', '--if-not-exists', 'flathub', FLATHUB])
+        self._flathub_ok = codigo == 0
+        return codigo, texto
+
+    def ao_escolher_categoria(self, botao, chave):
+        if botao.get_active():
+            self.categoria = chave
+            self.lista.invalidate_filter()
+
+    def filtrar(self, linha):
+        if self.categoria != 'todas' and linha.categoria != self.categoria:
+            return False
+        q = self.busca.get_text().strip().lower()
+        return not q or q in linha.nome.lower() or q in linha.desc.lower()
+
+
+if __name__ == '__main__':
+    GLib.set_prgname('brisa-loja')
+    janela = Loja()
+    janela.connect('destroy', Gtk.main_quit)
+    janela.show_all()
+    Gtk.main()

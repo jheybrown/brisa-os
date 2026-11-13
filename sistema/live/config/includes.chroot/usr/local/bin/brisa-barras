@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+"""Arranca as ilhas de cima e a doca (Waybar) no idioma da sessão.
+
+O modelo em ~/.config/waybar/config.jsonc tem marcas @assim@, trocadas pelos textos em
+português ou em inglês. Na sessão de instalação (a correr a partir da pen ou da ISO) a doca e os
+botões Aplicações e Janelas são retirados: só ficam as ilhas com o botão de instalar.
+"""
+import json
+import os
+import re
+import sys
+
+TEXTOS = {
+    'pt': {
+        'menu_dica': 'Menu do sistema', 'instalar_dica': 'Instala o Brisa no disco deste computador',
+        'janelas': 'Janelas', 'janelas_dica': 'Ver todas as janelas abertas',
+        'som': 'Som', 'sem_som': 'Sem som', 'bateria': 'Bateria', 'a_carregar': 'A carregar',
+        'data_longa': '{:L%A, %d de %B de %Y}',
+        'lancador': 'Aplicações', 'ficheiros': 'Ficheiros', 'navegador': 'Navegador',
+        'writer': 'Writer: documentos (como o Word)', 'calc': 'Calc: folhas de cálculo (como o Excel)',
+        'notas': 'Notas', 'calculadora': 'Calculadora', 'loja': 'Loja de aplicações', 'definicoes': 'Definições',
+    },
+    'en': {
+        'menu_dica': 'System menu', 'instalar_dica': 'Install Brisa on this computer',
+        'janelas': 'Windows', 'janelas_dica': 'See all open windows',
+        'som': 'Sound', 'sem_som': 'Muted', 'bateria': 'Battery', 'a_carregar': 'Charging',
+        'data_longa': '{:L%A, %B %d, %Y}',
+        'lancador': 'Applications', 'ficheiros': 'Files', 'navegador': 'Web browser',
+        'writer': 'Writer: documents (like Word)', 'calc': 'Calc: spreadsheets (like Excel)',
+        'notas': 'Notes', 'calculadora': 'Calculator', 'loja': 'App store', 'definicoes': 'Settings',
+    },
+}
+
+
+def em_instalacao():
+    return os.path.isdir('/run/live/medium') or os.environ.get('BRISA_AO_VIVO') == '1'
+
+
+lingua = 'pt' if os.environ.get('LANG', 'pt').lower().startswith('pt') else 'en'
+cfg = os.path.expanduser('~/.config/waybar')
+modelo = open(os.path.join(cfg, 'config.jsonc'), encoding='utf-8').read()
+modelo = '\n'.join(l for l in modelo.split('\n') if not l.lstrip().startswith('//'))  # tira os comentários
+for chave, texto in TEXTOS[lingua].items():
+    modelo = modelo.replace(f'@{chave}@', texto)
+modelo = modelo.replace('@locale@', os.environ.get('LANG', 'pt_PT.UTF-8'))
+barras = json.loads(re.sub(r',(\s*[\]}])', r'\1', modelo))
+
+if em_instalacao():
+    barras = [b for b in barras if b.get('name') != 'doca']
+    for b in barras:
+        b['modules-left'] = [m for m in b.get('modules-left', []) if m not in ('custom/aplicacoes', 'custom/janelas')]
+
+saida = os.path.join(os.environ.get('XDG_RUNTIME_DIR', '/tmp'), 'brisa-waybar.json')
+with open(saida, 'w', encoding='utf-8') as f:
+    json.dump(barras, f, ensure_ascii=False, indent=1)
+if '--so-gerar' in sys.argv:
+    print(saida)
+else:
+    # Tema escuro só para as barras: os ícones simbólicos da bandeja ficam claros sobre o vidro escuro
+    os.environ['GTK_THEME'] = 'Adwaita:dark'
+    os.execvp('waybar', ['waybar', '-c', saida, '-s', os.path.join(cfg, 'style.css')])

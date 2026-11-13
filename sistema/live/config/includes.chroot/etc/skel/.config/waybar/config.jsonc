@@ -1,0 +1,85 @@
+// Brisa 1.0 — layout Ilhas: três ilhas em cima e a doca vertical à direita (Waybar).
+// As marcas @assim@ são trocadas pelo texto no idioma da sessão, e na sessão de instalação
+// a doca e os botões de Aplicações e Janelas são retirados (ver brisa-barras).
+[
+  {
+    "name": "topo",
+    "layer": "top",
+    "position": "top",
+    "height": 38,
+    "margin-top": 8,
+    "margin-left": 10,
+    "margin-right": 10,
+    "spacing": 0,
+    "modules-left": ["custom/brisa", "custom/instalar", "custom/aplicacoes", "custom/janelas"],
+    "modules-center": ["clock"],
+    "modules-right": ["tray", "wireplumber", "battery"],
+
+    "custom/brisa": { "format": "≋  Brisa", "tooltip-format": "@menu_dica@", "on-click": "brisa-menu" },
+    "custom/instalar": {
+      "exec": "brisa-instalar --rotulo",
+      "interval": "once",
+      "tooltip-format": "@instalar_dica@",
+      "on-click": "brisa-instalar"
+    },
+    "custom/aplicacoes": { "format": "@lancador@", "tooltip": false, "on-click": "brisa-lancador" },
+    "custom/janelas": { "format": "@janelas@", "tooltip-format": "@janelas_dica@", "on-click": "brisa-janelas" },
+    "tray": { "icon-size": 16, "spacing": 12 },
+    "wireplumber": {
+      "format": "{icon}",
+      "format-muted": "",
+      "format-icons": ["", "", ""],
+      "tooltip-format": "@som@ {volume}%",
+      "on-click": "pavucontrol",
+      "scroll-step": 5
+    },
+    "battery": {
+      "format": "{icon}   {capacity}%",
+      "format-charging": "   {capacity}%",
+      "format-icons": ["", "", "", "", ""],
+      "tooltip-format": "@bateria@ {capacity}%",
+      "states": { "warning": 25, "critical": 12 }
+    },
+    "clock": {
+      "format": "{:L%a %e %b · %H:%M}",
+      "tooltip-format": "@data_longa@",
+      "locale": "@locale@"
+    }
+  },
+  {
+    "name": "doca",
+    "layer": "top",
+    "position": "right",
+    "width": 76,
+    "margin-right": 10,
+    "spacing": 0,
+    "modules-center": [
+      "custom/d-ficheiros", "custom/d-navegador", "custom/d-writer", "custom/d-calc", "custom/d-notas",
+      "custom/d-calculadora", "custom/d-loja", "custom/d-definicoes", "custom/d-lancador", "wlr/taskbar"
+    ],
+
+    // Cada ícone: o desenho vem do style.css; brisa-doca-estado acende o ponto quando a aplicação
+    // está aberta; brisa-abrir traz a janela para a frente, ou abre a aplicação se estiver fechada.
+    "custom/d-ficheiros":   { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@ficheiros@' thunar Thunar",                "on-click": "brisa-abrir thunar thunar" },
+    "custom/d-navegador":   { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@navegador@' firefox-esr firefox",      "on-click": "brisa-abrir firefox-esr firefox-esr" },
+    "custom/d-writer":      { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@writer@' libreoffice-writer",          "on-click": "brisa-abrir libreoffice-writer libreoffice --writer" },
+    "custom/d-calc":        { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@calc@' libreoffice-calc",              "on-click": "brisa-abrir libreoffice-calc libreoffice --calc" },
+    "custom/d-notas":       { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@notas@' mousepad org.xfce.mousepad",   "on-click": "brisa-abrir mousepad mousepad" },
+    "custom/d-calculadora": { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@calculadora@' galculator",            "on-click": "brisa-abrir galculator galculator" },
+    "custom/d-loja":        { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@loja@' brisa-loja",                    "on-click": "brisa-abrir brisa-loja brisa-loja" },
+    "custom/d-definicoes":  { "format": " ", "return-type": "json", "exec": "brisa-doca-estado '@definicoes@' brisa-definicoes",        "on-click": "brisa-abrir brisa-definicoes brisa-definicoes" },
+    "custom/d-lancador":    { "format": " ", "tooltip-format": "@lancador@",                                                        "on-click": "brisa-lancador" },
+
+    // Aplicações abertas que não estão fixas na doca (as fixas mostram o ponto em vez disso)
+    "wlr/taskbar": {
+      "format": "{icon}",
+      "icon-size": 44,
+      "icon-theme": "Papirus",
+      "tooltip-format": "{name}",
+      "on-click": "activate",
+      "on-click-middle": "close",
+      "ignore-list": ["thunar", "Thunar", "firefox-esr", "firefox", "libreoffice-writer", "libreoffice-calc",
+                      "org.xfce.mousepad", "mousepad", "galculator", "brisa-loja", "brisa-definicoes", "brisa-apps"]
+    }
+  }
+]

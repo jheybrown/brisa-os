@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""Mostra a vista geral de todas as janelas abertas (o mesmo que Super+W).
+
+Pede-a ao compositor Wayfire pela sua ligação de controlo; se não der, simula o atalho de teclado.
+"""
+import json
+import os
+import socket
+import struct
+import subprocess
+
+
+def pedir_ao_wayfire(metodo):
+    caminho = os.environ.get('WAYFIRE_SOCKET')
+    if not caminho:
+        return False
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(2)
+            s.connect(caminho)
+            corpo = json.dumps({'method': metodo, 'data': {}}).encode()
+            s.sendall(struct.pack('<I', len(corpo)) + corpo)
+            tamanho = struct.unpack('<I', s.recv(4))[0]
+            resposta = json.loads(s.recv(tamanho).decode() or '{}')
+            return resposta.get('result') == 'ok'
+    except (OSError, ValueError, struct.error):
+        return False
+
+
+if not pedir_ao_wayfire('scale/toggle'):
+    subprocess.run(['wtype', '-M', 'logo', '-k', 'w', '-m', 'logo'], check=False)
